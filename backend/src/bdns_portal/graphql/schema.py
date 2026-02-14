@@ -1,322 +1,323 @@
-
+# graphql/schema.py
+from typing import Optional, List
+from uuid import UUID
 import strawberry
-from typing import List, Optional
 
-# ==================== TYPES ====================
-
-from .types.concesion import Concesion, ConcesionInput
-from .types.beneficiario import Beneficiario, BeneficiarioInput
-from .types.estadisticas import EstadisticasConcesiones, FiltroEstadisticas
-from .types.notificaciones import (
-    Usuario,
-    Suscripcion,
-    Ejecucion,
-    TelegramLink,
-    FilterDefinition,
-    FieldDefinition,
-    QueryPreview,
-    TestResult,
-    EntidadesDisponibles,
+# Types existentes
+from .types.convocatoria import (
+    Convocatoria, ConvocatoriaConnection, 
+    DocumentoConvocatoria, AnuncioConvocatoria, PageInfo
+)
+from .types.beneficiario import (
+    Beneficiario, BeneficiarioConnection, Pseudonimo
+)
+from .types.concesion import (
+    Concesion, ConcesionConnection
+)
+from .types.catalogos import (
+    Finalidad, Fondo, FormaJuridica, Instrumento,
+    Objetivo, Organo, Reglamento, Region, RegimenAyuda,
+    SectorActividad, SectorProducto, TipoBeneficiario
+)
+from .types.estadisticas import (
+    EstadisticasConcesiones,
+    EvolucionMensual,
+    EstadisticasRegimen,
+    EstadisticasRegion,
+    TopConvocatoria,
+    ComparativaAnual,
+    FiltroEstadisticas
 )
 
-# ==================== RESOLVERS ====================
+# Inputs
+from .inputs.convocatoria import (
+    ConvocatoriaFilterInput, ConvocatoriaSortInput, PaginationInput
+)
+from .inputs.beneficiario import (
+    BeneficiarioFilterInput, BeneficiarioSortInput
+)
+from .inputs.concesion import (
+    ConcesionFilterInput, ConcesionSortInput
+)
+from .inputs.catalogos import (
+    CatalogoFilterInput
+)
 
-from .resolvers.concesiones import (
-    get_concesiones,
-    get_concesion_by_id,
-    get_concesiones_por_beneficiario,
-)
-from .resolvers.beneficiarios import (
-    get_beneficiarios,
-    get_beneficiario_by_id,
-)
+# Resolvers
+from .resolvers import convocatoria as conv_resolvers
+from .resolvers import beneficiario as ben_resolvers
+from .resolvers import concesion as conc_resolvers
+from .resolvers import catalogos as cat_resolvers
+
+# Resolvers de estadísticas
 from .resolvers.estadisticas import (
     get_estadisticas_por_tipo_entidad,
     get_estadisticas_por_organo,
     get_concentracion_subvenciones,
+    get_estadisticas_evolucion_mensual,
+    get_estadisticas_por_regimen,
+    get_estadisticas_por_region,
+    get_top_convocatorias,
+    get_beneficiarios_recurrentes,
+    get_comparativa_anual
 )
-from .resolvers import notificaciones as notif
 
-
-# ==================== QUERY ====================
 
 @strawberry.type
 class Query:
+    # ============ CONVOCATORIAS ============
     @strawberry.field
-    async def concesion(self, id: strawberry.ID) -> Optional[Concesion]:
-        return await get_concesion_by_id(id)
-
-    @strawberry.field
-    async def concesiones(
+    async def convocatorias(
         self,
-        filtros: Optional[ConcesionInput] = None,
-        limite: int = 100,
-        offset: int = 0,
-    ) -> List[Concesion]:
-        return await get_concesiones(filtros, limite, offset)
-
+        info: strawberry.Info,
+        pagination: Optional[PaginationInput] = None,
+        where: Optional[ConvocatoriaFilterInput] = None,
+        order_by: Optional[List[ConvocatoriaSortInput]] = None
+    ) -> ConvocatoriaConnection:
+        return await conv_resolvers.get_convocatorias(info, pagination, where, order_by)
+    
     @strawberry.field
-    async def beneficiario(self, id: strawberry.ID) -> Optional[Beneficiario]:
-        return await get_beneficiario_by_id(id)
-
+    async def convocatoria(
+        self,
+        info: strawberry.Info,
+        id: UUID
+    ) -> Optional[Convocatoria]:
+        return await conv_resolvers.get_convocatoria_by_id(info, id)
+    
+    @strawberry.field
+    async def buscar_convocatorias(
+        self,
+        info: strawberry.Info,
+        q: str,
+        limit: int = 10
+    ) -> List[Convocatoria]:
+        return await conv_resolvers.buscar_convocatorias(info, q, limit)
+    
+    # ============ BENEFICIARIOS ============
     @strawberry.field
     async def beneficiarios(
         self,
-        filtros: Optional[BeneficiarioInput] = None,
-        limite: int = 100,
-        offset: int = 0,
+        info: strawberry.Info,
+        pagination: Optional[PaginationInput] = None,
+        where: Optional[BeneficiarioFilterInput] = None,
+        order_by: Optional[List[BeneficiarioSortInput]] = None
+    ) -> BeneficiarioConnection:
+        return await ben_resolvers.get_beneficiarios(info, pagination, where, order_by)
+    
+    @strawberry.field
+    async def beneficiario(
+        self,
+        info: strawberry.Info,
+        id: UUID
+    ) -> Optional[Beneficiario]:
+        return await ben_resolvers.get_beneficiario_by_id(info, id)
+    
+    @strawberry.field
+    async def buscar_beneficiarios(
+        self,
+        info: strawberry.Info,
+        q: str,
+        limit: int = 10
     ) -> List[Beneficiario]:
-        return await get_beneficiarios(filtros, limite, offset)
-
+        return await ben_resolvers.buscar_beneficiarios(info, q, limit)
+    
+    # ============ CONCESIONES ============
+    @strawberry.field
+    async def concesiones(
+        self,
+        info: strawberry.Info,
+        pagination: Optional[PaginationInput] = None,
+        where: Optional[ConcesionFilterInput] = None,
+        order_by: Optional[List[ConcesionSortInput]] = None
+    ) -> ConcesionConnection:
+        return await conc_resolvers.get_concesiones(info, pagination, where, order_by)
+    
+    @strawberry.field
+    async def concesion(
+        self,
+        info: strawberry.Info,
+        id: UUID
+    ) -> Optional[Concesion]:
+        return await conc_resolvers.get_concesion_by_id(info, id)
+    
     @strawberry.field
     async def concesiones_por_beneficiario(
         self,
-        beneficiario_id: strawberry.ID,
+        info: strawberry.Info,
+        beneficiario_id: UUID,
         anio: Optional[int] = None,
-        limite: int = 100,
-        offset: int = 0,
-    ) -> List[Concesion]:
-        return await get_concesiones_por_beneficiario(
-            beneficiario_id, anio, limite, offset
+        pagination: Optional[PaginationInput] = None
+    ) -> ConcesionConnection:
+        return await conc_resolvers.get_concesiones_por_beneficiario(
+            info, beneficiario_id, anio, pagination
         )
-
+    
+    @strawberry.field
+    async def concesiones_por_convocatoria(
+        self,
+        info: strawberry.Info,
+        convocatoria_id: UUID,
+        pagination: Optional[PaginationInput] = None
+    ) -> ConcesionConnection:
+        return await conc_resolvers.get_concesiones_por_convocatoria(
+            info, convocatoria_id, pagination
+        )
+    
+    # ============ CATÁLOGOS ============
+    @strawberry.field
+    async def finalidades(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None
+    ) -> List[Finalidad]:
+        return await cat_resolvers.get_finalidades(info, where)
+    
+    @strawberry.field
+    async def fondos(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None
+    ) -> List[Fondo]:
+        return await cat_resolvers.get_fondos(info, where)
+    
+    @strawberry.field
+    async def formas_juridicas(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None
+    ) -> List[FormaJuridica]:
+        return await cat_resolvers.get_formas_juridicas(info, where)
+    
+    @strawberry.field
+    async def instrumentos(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None
+    ) -> List[Instrumento]:
+        return await cat_resolvers.get_instrumentos(info, where)
+    
+    @strawberry.field
+    async def objetivos(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None
+    ) -> List[Objetivo]:
+        return await cat_resolvers.get_objetivos(info, where)
+    
+    @strawberry.field
+    async def organos(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None,
+        incluir_hijos: bool = False
+    ) -> List[Organo]:
+        return await cat_resolvers.get_organos(info, where, incluir_hijos)
+    
+    @strawberry.field
+    async def regiones(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None,
+        incluir_hijos: bool = False
+    ) -> List[Region]:
+        return await cat_resolvers.get_regiones(info, where, incluir_hijos)
+    
+    @strawberry.field
+    async def sectores_actividad(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None,
+        incluir_hijos: bool = False
+    ) -> List[SectorActividad]:
+        return await cat_resolvers.get_sectores_actividad(info, where, incluir_hijos)
+    
+    @strawberry.field
+    async def tipos_beneficiario(
+        self,
+        info: strawberry.Info,
+        where: Optional[CatalogoFilterInput] = None
+    ) -> List[TipoBeneficiario]:
+        return await cat_resolvers.get_tipos_beneficiario(info, where)
+    
+    # ============ ESTADÍSTICAS ============
     @strawberry.field
     async def estadisticas_por_tipo_entidad(
         self,
-        filtros: Optional[FiltroEstadisticas] = None,
+        info: strawberry.Info,
+        filtros: Optional[FiltroEstadisticas] = None
     ) -> List[EstadisticasConcesiones]:
-        return await get_estadisticas_por_tipo_entidad(filtros)
-
+        return await get_estadisticas_por_tipo_entidad(info, filtros)
+    
     @strawberry.field
     async def estadisticas_por_organo(
         self,
-        filtros: Optional[FiltroEstadisticas] = None,
+        info: strawberry.Info,
+        filtros: Optional[FiltroEstadisticas] = None
     ) -> List[EstadisticasConcesiones]:
-        return await get_estadisticas_por_organo(filtros)
-
+        return await get_estadisticas_por_organo(info, filtros)
+    
     @strawberry.field
     async def concentracion_subvenciones(
         self,
+        info: strawberry.Info,
         anio: Optional[int] = None,
         tipo_entidad: Optional[str] = None,
-        limite: int = 10,
+        limite: int = 10
     ) -> List[EstadisticasConcesiones]:
-        return await get_concentracion_subvenciones(
-            anio, tipo_entidad, limite
-        )
-
-    # ==================== NOTIFICACIONES ====================
-
+        return await get_concentracion_subvenciones(info, anio, tipo_entidad, limite)
+    
     @strawberry.field
-    async def usuarios(
+    async def estadisticas_evolucion_mensual(
         self,
-        activo: Optional[bool] = None,
-        limite: int = 100,
-        offset: int = 0,
-    ) -> List[Usuario]:
-        return await notif.get_usuarios(activo, limite, offset)
-
+        info: strawberry.Info,
+        anio: int
+    ) -> List[EvolucionMensual]:
+        return await get_estadisticas_evolucion_mensual(info, anio)
+    
     @strawberry.field
-    async def usuario(self, id: int) -> Optional[Usuario]:
-        return await notif.get_usuario(id)
-
+    async def estadisticas_por_regimen(
+        self,
+        info: strawberry.Info,
+        anio: Optional[int] = None
+    ) -> List[EstadisticasRegimen]:
+        return await get_estadisticas_por_regimen(info, anio)
+    
     @strawberry.field
-    async def suscripciones(
+    async def estadisticas_por_region(
         self,
-        usuario_id: Optional[int] = None,
-        activo: Optional[bool] = None,
-        limite: int = 100,
-        offset: int = 0,
-    ) -> List[Suscripcion]:
-        return await notif.get_suscripciones(
-            usuario_id, activo, limite, offset
-        )
-
+        info: strawberry.Info,
+        anio: Optional[int] = None,
+        limite: int = 20
+    ) -> List[EstadisticasRegion]:
+        return await get_estadisticas_por_region(info, anio, limite)
+    
     @strawberry.field
-    async def suscripcion(self, id: int) -> Optional[Suscripcion]:
-        return await notif.get_suscripcion(id)
-
+    async def top_convocatorias(
+        self,
+        info: strawberry.Info,
+        anio: Optional[int] = None,
+        limite: int = 10
+    ) -> List[TopConvocatoria]:
+        return await get_top_convocatorias(info, anio, limite)
+    
     @strawberry.field
-    async def ejecuciones(
+    async def beneficiarios_recurrentes(
         self,
-        subscripcion_id: Optional[int] = None,
-        estado: Optional[str] = None,
-        limite: int = 100,
-        offset: int = 0,
-    ) -> List[Ejecucion]:
-        return await notif.get_ejecuciones(
-            subscripcion_id, estado, limite, offset
-        )
-
-    # ==================== QUERY BUILDER ====================
-
+        info: strawberry.Info,
+        anio: Optional[int] = None,
+        minimo_concesiones: int = 3,
+        limite: int = 20
+    ) -> List[EstadisticasConcesiones]:
+        return await get_beneficiarios_recurrentes(info, anio, minimo_concesiones, limite)
+    
     @strawberry.field
-    async def entidades_disponibles(self) -> EntidadesDisponibles:
-        return await notif.get_entidades_disponibles()
-
-    @strawberry.field
-    async def filtros_disponibles(
-        self, entity: str
-    ) -> List[FilterDefinition]:
-        return await notif.get_filtros_disponibles(entity)
-
-    @strawberry.field
-    async def campos_disponibles(
-        self, entity: str
-    ) -> List[FieldDefinition]:
-        return await notif.get_campos_disponibles(entity)
-
-    @strawberry.field
-    async def preview_query(
+    async def comparativa_anual(
         self,
-        entity: str,
-        filters: strawberry.scalars.JSON,
-        fields: Optional[List[str]] = None,
-        limite: int = 1000,
-    ) -> QueryPreview:
-        return await notif.preview_query(
-            entity, filters or {}, fields, limite
-        )
-
-    @strawberry.field
-    async def test_query(
-        self,
-        entity: str,
-        filters: strawberry.scalars.JSON,
-        fields: Optional[List[str]] = None,
-        limite: int = 100,
-    ) -> TestResult:
-        return await notif.test_query(
-            entity, filters or {}, fields, limite
-        )
+        info: strawberry.Info,
+        anio_base: int,
+        anio_comparar: int
+    ) -> ComparativaAnual:
+        return await get_comparativa_anual(info, anio_base, anio_comparar)
 
 
-# ==================== MUTATION ====================
-
-@strawberry.type
-class Mutation:
-    @strawberry.mutation
-    async def crear_usuario(
-        self,
-        email: str,
-        nombre: Optional[str] = None,
-    ) -> Usuario:
-        return await notif.crear_usuario(email, nombre)
-
-    @strawberry.mutation
-    async def actualizar_usuario(
-        self,
-        id: int,
-        email: Optional[str] = None,
-        nombre: Optional[str] = None,
-        activo: Optional[bool] = None,
-    ) -> Optional[Usuario]:
-        return await notif.actualizar_usuario(
-            id, email, nombre, activo
-        )
-
-    @strawberry.mutation
-    async def eliminar_usuario(self, id: int) -> bool:
-        return await notif.eliminar_usuario(id)
-
-    @strawberry.mutation
-    async def generar_link_telegram(
-        self, usuario_id: int
-    ) -> Optional[TelegramLink]:
-        return await notif.generar_link_telegram(usuario_id)
-
-    @strawberry.mutation
-    async def crear_suscripcion(
-        self,
-        usuario_id: int,
-        nombre: str,
-        graphql_query: str,
-        descripcion: Optional[str] = None,
-        campo_id: str = "id",
-        campos_comparar: Optional[List[str]] = None,
-        frecuencia: str = "semanal",
-        hora_preferida: int = 8,
-    ) -> Optional[Suscripcion]:
-        return await notif.crear_suscripcion(
-            usuario_id,
-            nombre,
-            graphql_query,
-            descripcion,
-            campo_id,
-            campos_comparar,
-            frecuencia,
-            hora_preferida,
-        )
-
-    @strawberry.mutation
-    async def crear_suscripcion_desde_builder(
-        self,
-        usuario_id: int,
-        nombre: str,
-        entity: str,
-        filters: strawberry.scalars.JSON,
-        descripcion: Optional[str] = None,
-        fields: Optional[List[str]] = None,
-        limite: int = 1000,
-        frecuencia: str = "semanal",
-        hora_preferida: int = 8,
-    ) -> Optional[Suscripcion]:
-        return await notif.crear_suscripcion_desde_builder(
-            usuario_id,
-            nombre,
-            entity,
-            filters or {},
-            descripcion,
-            fields,
-            limite,
-            frecuencia,
-            hora_preferida,
-        )
-
-    @strawberry.mutation
-    async def actualizar_suscripcion(
-        self,
-        id: int,
-        nombre: Optional[str] = None,
-        descripcion: Optional[str] = None,
-        graphql_query: Optional[str] = None,
-        campo_id: Optional[str] = None,
-        campos_comparar: Optional[List[str]] = None,
-        frecuencia: Optional[str] = None,
-        hora_preferida: Optional[int] = None,
-        activo: Optional[bool] = None,
-        max_errores: Optional[int] = None,
-    ) -> Optional[Suscripcion]:
-        return await notif.actualizar_suscripcion(
-            id,
-            nombre,
-            descripcion,
-            graphql_query,
-            campo_id,
-            campos_comparar,
-            frecuencia,
-            hora_preferida,
-            activo,
-            max_errores,
-        )
-
-    @strawberry.mutation
-    async def eliminar_suscripcion(self, id: int) -> bool:
-        return await notif.eliminar_suscripcion(id)
-
-    @strawberry.mutation
-    async def ejecutar_suscripcion(
-        self, id: int
-    ) -> Optional[Ejecucion]:
-        return await notif.ejecutar_suscripcion(id)
-
-    @strawberry.mutation
-    async def reactivar_suscripcion(
-        self, id: int
-    ) -> Optional[Suscripcion]:
-        return await notif.reactivar_suscripcion(id)
-
-
-# ==================== SCHEMA ====================
-
-schema = strawberry.Schema(query=Query, mutation=Mutation)
+schema = strawberry.Schema(query=Query)

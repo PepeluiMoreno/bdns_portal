@@ -35,7 +35,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Configuracion
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+psycopg2://bdns:bdns@localhost:5432/bdns')
-GRAPHQL_URL = os.getenv('GRAPHQL_URL', 'http://localhost:8000/graphql')
+GRAPHQL_URL = os.getenv('GRAPHQL_URL', 'http://localhost:8001/graphql')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '')
 
 engine = create_engine(DATABASE_URL)

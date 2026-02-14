@@ -3,18 +3,15 @@ Resolvers GraphQL para el sistema de notificaciones.
 
 Queries y Mutations para gestionar usuarios, suscripciones y el query builder.
 """
-import sys
-from pathlib import Path
+# graphql/resolvers/notificaciones.py
 from typing import List, Optional
+from uuid import UUID
 from datetime import datetime
+from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 
-# Setup path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-
-from bdns_core.db.session import get_db_context
 from bdns_core.db.models import Usuario, SubscripcionNotificacion, EjecucionNotificacion
-from app.graphql.types.notificaciones import (
+from ..types.notificaciones import (
     Usuario as UsuarioType,
     Suscripcion as SuscripcionType,
     Ejecucion as EjecucionType,
@@ -28,10 +25,11 @@ from app.graphql.types.notificaciones import (
 )
 
 
+# ==================== CONVERSORES ====================
+
 def _usuario_to_type(u) -> UsuarioType:
-    """Convierte modelo a tipo GraphQL."""
     return UsuarioType(
-        id=str(u.id),
+        id=u.id,
         email=u.email,
         nombre=u.nombre,
         telegram_chat_id=u.telegram_chat_id,
@@ -43,9 +41,8 @@ def _usuario_to_type(u) -> UsuarioType:
 
 
 def _suscripcion_to_type(s) -> SuscripcionType:
-    """Convierte modelo a tipo GraphQL."""
     return SuscripcionType(
-        id=str(s.id),
+        id=s.id,
         usuario_id=s.usuario_id,
         nombre=s.nombre,
         descripcion=s.descripcion,
@@ -66,9 +63,8 @@ def _suscripcion_to_type(s) -> SuscripcionType:
 
 
 def _ejecucion_to_type(e) -> EjecucionType:
-    """Convierte modelo a tipo GraphQL."""
     return EjecucionType(
-        id=str(e.id),
+        id=e.id,
         subscripcion_id=e.subscripcion_id,
         fecha_ejecucion=e.fecha_ejecucion,
         estado=e.estado,
@@ -86,84 +82,126 @@ def _ejecucion_to_type(e) -> EjecucionType:
 # ==================== QUERIES: USUARIOS ====================
 
 async def get_usuarios(
+    info,
     activo: Optional[bool] = None,
     limite: int = 100,
     offset: int = 0
 ) -> List[UsuarioType]:
-    """Lista usuarios."""
-    with get_db_context() as db:
-        query = db.query(Usuario)
-        if activo is not None:
-            query = query.filter(Usuario.activo == activo)
-        usuarios = query.offset(offset).limit(limite).all()
-        return [_usuario_to_type(u) for u in usuarios]
+    db = info.context["db"]
+    
+    stmt = select(Usuario)
+    if activo is not None:
+        stmt = stmt.where(Usuario.activo == activo)
+    
+    stmt = stmt.offset(offset).limit(limite)
+    result = await db.execute(stmt)
+    usuarios = result.scalars().all()
+    
+    return [_usuario_to_type(u) for u in usuarios]
 
 
-async def get_usuario(id: int) -> Optional[UsuarioType]:
-    """Obtiene un usuario por ID."""
-    with get_db_context() as db:
-        u = db.query(Usuario).filter(Usuario.id == id).first()
-        return _usuario_to_type(u) if u else None
+async def get_usuario(
+    info,
+    id: UUID
+) -> Optional[UsuarioType]:
+    db = info.context["db"]
+    
+    stmt = select(Usuario).where(Usuario.id == id)
+    result = await db.execute(stmt)
+    u = result.scalar_one_or_none()
+    
+    return _usuario_to_type(u) if u else None
+
+
+async def get_usuario_por_email(
+    info,
+    email: str
+) -> Optional[UsuarioType]:
+    db = info.context["db"]
+    
+    stmt = select(Usuario).where(Usuario.email == email)
+    result = await db.execute(stmt)
+    u = result.scalar_one_or_none()
+    
+    return _usuario_to_type(u) if u else None
 
 
 # ==================== QUERIES: SUSCRIPCIONES ====================
 
 async def get_suscripciones(
-    usuario_id: Optional[int] = None,
+    info,
+    usuario_id: Optional[UUID] = None,
     activo: Optional[bool] = None,
     limite: int = 100,
     offset: int = 0
 ) -> List[SuscripcionType]:
-    """Lista suscripciones."""
-    with get_db_context() as db:
-        query = db.query(SubscripcionNotificacion)
-        if usuario_id is not None:
-            query = query.filter(SubscripcionNotificacion.usuario_id == usuario_id)
-        if activo is not None:
-            query = query.filter(SubscripcionNotificacion.activo == activo)
-        subs = query.order_by(SubscripcionNotificacion.created_at.desc()).offset(offset).limit(limite).all()
-        return [_suscripcion_to_type(s) for s in subs]
+    db = info.context["db"]
+    
+    stmt = select(SubscripcionNotificacion)
+    if usuario_id is not None:
+        stmt = stmt.where(SubscripcionNotificacion.usuario_id == usuario_id)
+    if activo is not None:
+        stmt = stmt.where(SubscripcionNotificacion.activo == activo)
+    
+    stmt = stmt.order_by(SubscripcionNotificacion.created_at.desc()).offset(offset).limit(limite)
+    result = await db.execute(stmt)
+    subs = result.scalars().all()
+    
+    return [_suscripcion_to_type(s) for s in subs]
 
 
-async def get_suscripcion(id: int) -> Optional[SuscripcionType]:
-    """Obtiene una suscripcion por ID."""
-    with get_db_context() as db:
-        s = db.query(SubscripcionNotificacion).filter(SubscripcionNotificacion.id == id).first()
-        return _suscripcion_to_type(s) if s else None
+async def get_suscripcion(
+    info,
+    id: UUID
+) -> Optional[SuscripcionType]:
+    db = info.context["db"]
+    
+    stmt = select(SubscripcionNotificacion).where(SubscripcionNotificacion.id == id)
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
+    
+    return _suscripcion_to_type(s) if s else None
 
 
 # ==================== QUERIES: EJECUCIONES ====================
 
 async def get_ejecuciones(
-    subscripcion_id: Optional[int] = None,
+    info,
+    subscripcion_id: Optional[UUID] = None,
     estado: Optional[str] = None,
     limite: int = 100,
     offset: int = 0
 ) -> List[EjecucionType]:
-    """Lista historial de ejecuciones."""
-    with get_db_context() as db:
-        query = db.query(EjecucionNotificacion)
-        if subscripcion_id is not None:
-            query = query.filter(EjecucionNotificacion.subscripcion_id == subscripcion_id)
-        if estado is not None:
-            query = query.filter(EjecucionNotificacion.estado == estado)
-        ejecs = query.order_by(EjecucionNotificacion.fecha_ejecucion.desc()).offset(offset).limit(limite).all()
-        return [_ejecucion_to_type(e) for e in ejecs]
+    db = info.context["db"]
+    
+    stmt = select(EjecucionNotificacion)
+    if subscripcion_id is not None:
+        stmt = stmt.where(EjecucionNotificacion.subscripcion_id == subscripcion_id)
+    if estado is not None:
+        stmt = stmt.where(EjecucionNotificacion.estado == estado)
+    
+    stmt = stmt.order_by(EjecucionNotificacion.fecha_ejecucion.desc()).offset(offset).limit(limite)
+    result = await db.execute(stmt)
+    ejecs = result.scalars().all()
+    
+    return [_ejecucion_to_type(e) for e in ejecs]
 
 
 # ==================== QUERIES: QUERY BUILDER ====================
 
-async def get_entidades_disponibles() -> EntidadesDisponibles:
-    """Lista entidades disponibles para suscripcion."""
+async def get_entidades_disponibles(info) -> EntidadesDisponibles:
     from telegram_notifications.query_builder import QueryBuilder
+    
     return EntidadesDisponibles(
         entities=list(QueryBuilder.ENTITIES.keys()),
         default="concesiones"
     )
 
 
-async def get_filtros_disponibles(entity: str) -> List[FilterDefinition]:
-    """Obtiene filtros disponibles para una entidad."""
+async def get_filtros_disponibles(
+    info,
+    entity: str
+) -> List[FilterDefinition]:
     from telegram_notifications.query_builder import QueryBuilder
 
     if entity not in QueryBuilder.ENTITIES:
@@ -171,24 +209,29 @@ async def get_filtros_disponibles(entity: str) -> List[FilterDefinition]:
 
     filtros = QueryBuilder.get_available_filters(entity)
     result = []
+    
     for f in filtros:
         options = None
         if f.get("options"):
             options = [FilterOption(value=o["value"], label=o["label"]) for o in f["options"]]
+        
         result.append(FilterDefinition(
             name=f["name"],
             label=f["label"],
             type=f["type"],
             options=options,
-            description=f["description"],
-            ejemplo=f["ejemplo"],
-            graphql_param=f["graphql_param"],
+            description=f.get("description"),
+            ejemplo=f.get("ejemplo"),
+            graphql_param=f.get("graphql_param"),
         ))
+    
     return result
 
 
-async def get_campos_disponibles(entity: str) -> List[FieldDefinition]:
-    """Obtiene campos seleccionables para una entidad."""
+async def get_campos_disponibles(
+    info,
+    entity: str
+) -> List[FieldDefinition]:
     from telegram_notifications.query_builder import QueryBuilder
 
     if entity not in QueryBuilder.ENTITIES:
@@ -199,12 +242,12 @@ async def get_campos_disponibles(entity: str) -> List[FieldDefinition]:
 
 
 async def preview_query(
+    info,
     entity: str,
     filters: dict,
     fields: Optional[List[str]] = None,
     limite: int = 1000
 ) -> QueryPreview:
-    """Genera preview de query GraphQL."""
     from telegram_notifications.query_builder import QueryBuilder
 
     builder = QueryBuilder(entity=entity, limite=limite)
@@ -217,6 +260,7 @@ async def preview_query(
         builder.select_fields(fields)
 
     preview = builder.preview()
+    
     return QueryPreview(
         query=preview["query"],
         entity=preview["entity"],
@@ -227,12 +271,12 @@ async def preview_query(
 
 
 async def test_query(
+    info,
     entity: str,
     filters: dict,
     fields: Optional[List[str]] = None,
     limite: int = 100
 ) -> TestResult:
-    """Ejecuta query en modo test."""
     import time
     from telegram_notifications.query_builder import QueryBuilder
     from telegram_notifications.monitor import execute_graphql_query, extract_records
@@ -258,6 +302,7 @@ async def test_query(
             primeros_registros=[],
             query_ejecutada=query,
             duracion_ms=round(duration_ms, 2),
+            error=error
         )
 
     records = extract_records(data, "id")
@@ -272,83 +317,120 @@ async def test_query(
 
 # ==================== MUTATIONS: USUARIOS ====================
 
-async def crear_usuario(email: str, nombre: Optional[str] = None) -> UsuarioType:
-    """Crea un nuevo usuario."""
-    with get_db_context() as db:
-        # Verificar email unico
-        if db.query(Usuario).filter(Usuario.email == email).first():
-            raise Exception("Email ya registrado")
+async def crear_usuario(
+    info,
+    email: str,
+    nombre: Optional[str] = None
+) -> UsuarioType:
+    db = info.context["db"]
+    
+    # Verificar email unico
+    stmt = select(Usuario).where(Usuario.email == email)
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
+        raise ValueError(f"Email {email} ya registrado")
 
-        u = Usuario(email=email, nombre=nombre)
-        db.add(u)
-        db.commit()
-        db.refresh(u)
-        return _usuario_to_type(u)
+    u = Usuario(
+        email=email,
+        nombre=nombre,
+        username=email.split('@')[0],  # Temporal hasta que tengas registro completo
+        hashed_password="",  # La auth va en otro módulo
+        role="user",
+        activo=True
+    )
+    
+    db.add(u)
+    await db.commit()
+    await db.refresh(u)
+    
+    return _usuario_to_type(u)
 
 
 async def actualizar_usuario(
-    id: int,
+    info,
+    id: UUID,
     email: Optional[str] = None,
     nombre: Optional[str] = None,
     activo: Optional[bool] = None
 ) -> Optional[UsuarioType]:
-    """Actualiza un usuario."""
-    with get_db_context() as db:
-        u = db.query(Usuario).filter(Usuario.id == id).first()
-        if not u:
-            return None
+    db = info.context["db"]
+    
+    stmt = select(Usuario).where(Usuario.id == id)
+    result = await db.execute(stmt)
+    u = result.scalar_one_or_none()
+    
+    if not u:
+        return None
 
-        if email is not None:
-            u.email = email
-        if nombre is not None:
-            u.nombre = nombre
-        if activo is not None:
-            u.activo = activo
+    if email is not None:
+        u.email = email
+    if nombre is not None:
+        u.nombre = nombre
+    if activo is not None:
+        u.activo = activo
 
-        db.commit()
-        db.refresh(u)
-        return _usuario_to_type(u)
-
-
-async def eliminar_usuario(id: int) -> bool:
-    """Elimina un usuario y sus suscripciones."""
-    with get_db_context() as db:
-        u = db.query(Usuario).filter(Usuario.id == id).first()
-        if not u:
-            return False
-        db.delete(u)
-        db.commit()
-        return True
+    await db.commit()
+    await db.refresh(u)
+    
+    return _usuario_to_type(u)
 
 
-async def generar_link_telegram(usuario_id: int) -> Optional[TelegramLink]:
-    """Genera token para vincular Telegram."""
+async def eliminar_usuario(
+    info,
+    id: UUID
+) -> bool:
+    db = info.context["db"]
+    
+    stmt = select(Usuario).where(Usuario.id == id)
+    result = await db.execute(stmt)
+    u = result.scalar_one_or_none()
+    
+    if not u:
+        return False
+    
+    await db.delete(u)
+    await db.commit()
+    
+    return True
+
+
+async def generar_link_telegram(
+    info,
+    usuario_id: UUID
+) -> Optional[TelegramLink]:
     import secrets
+    from datetime import datetime, timedelta
+    
+    db = info.context["db"]
+    
+    stmt = select(Usuario).where(Usuario.id == usuario_id)
+    result = await db.execute(stmt)
+    u = result.scalar_one_or_none()
+    
+    if not u:
+        return None
 
-    with get_db_context() as db:
-        u = db.query(Usuario).filter(Usuario.id == usuario_id).first()
-        if not u:
-            return None
+    token = secrets.token_urlsafe(32)
+    u.telegram_token_verificacion = token
+    u.telegram_token_expira = datetime.utcnow() + timedelta(hours=24)
+    u.telegram_verificado = False
+    
+    await db.commit()
 
-        token = secrets.token_urlsafe(32)
-        u.telegram_token_verificacion = token
-        u.telegram_verificado = False
-        db.commit()
-
-        return TelegramLink(
-            token=token,
-            instrucciones=(
-                f"Envia este mensaje al bot de Telegram @BDNS_NotificadorBot:\n\n"
-                f"/vincular {token}\n\n"
-                f"El token expira en 24 horas."
-            )
-        )
+    return TelegramLink(
+        usuario_id=usuario_id,
+        token=token,
+        url=f"https://t.me/BDNS_NotificadorBot?start={token}",
+        expires_at=u.telegram_token_expira,
+        instrucciones=f"Envía /vincular {token} al bot @BDNS_NotificadorBot"
+    )
 
 
 # ==================== MUTATIONS: SUSCRIPCIONES ====================
 
 async def crear_suscripcion(
-    usuario_id: int,
+    info,
+    usuario_id: UUID,
     nombre: str,
     graphql_query: str,
     descripcion: Optional[str] = None,
@@ -357,30 +439,35 @@ async def crear_suscripcion(
     frecuencia: str = "semanal",
     hora_preferida: int = 8
 ) -> Optional[SuscripcionType]:
-    """Crea una nueva suscripcion."""
-    with get_db_context() as db:
-        # Verificar usuario
-        if not db.query(Usuario).filter(Usuario.id == usuario_id).first():
-            return None
+    db = info.context["db"]
+    
+    # Verificar usuario
+    stmt = select(Usuario).where(Usuario.id == usuario_id)
+    result = await db.execute(stmt)
+    if not result.scalar_one_or_none():
+        return None
 
-        s = SubscripcionNotificacion(
-            usuario_id=usuario_id,
-            nombre=nombre,
-            descripcion=descripcion,
-            graphql_query=graphql_query,
-            campo_id=campo_id,
-            campos_comparar=campos_comparar,
-            frecuencia=frecuencia,
-            hora_preferida=hora_preferida,
-        )
-        db.add(s)
-        db.commit()
-        db.refresh(s)
-        return _suscripcion_to_type(s)
+    s = SubscripcionNotificacion(
+        usuario_id=usuario_id,
+        nombre=nombre,
+        descripcion=descripcion,
+        graphql_query=graphql_query,
+        campo_id=campo_id,
+        campos_comparar=campos_comparar,
+        frecuencia=frecuencia,
+        hora_preferida=hora_preferida,
+    )
+    
+    db.add(s)
+    await db.commit()
+    await db.refresh(s)
+    
+    return _suscripcion_to_type(s)
 
 
 async def crear_suscripcion_desde_builder(
-    usuario_id: int,
+    info,
+    usuario_id: UUID,
     nombre: str,
     entity: str,
     filters: dict,
@@ -390,42 +477,47 @@ async def crear_suscripcion_desde_builder(
     frecuencia: str = "semanal",
     hora_preferida: int = 8
 ) -> Optional[SuscripcionType]:
-    """Crea suscripcion desde el query builder."""
     from telegram_notifications.query_builder import QueryBuilder
+    
+    db = info.context["db"]
+    
+    # Verificar usuario
+    stmt = select(Usuario).where(Usuario.id == usuario_id)
+    result = await db.execute(stmt)
+    if not result.scalar_one_or_none():
+        return None
 
-    with get_db_context() as db:
-        # Verificar usuario
-        if not db.query(Usuario).filter(Usuario.id == usuario_id).first():
-            return None
+    # Construir query
+    builder = QueryBuilder(entity=entity, limite=limite)
+    for key, value in (filters or {}).items():
+        if value is not None and value != "":
+            builder.add_filter(key, value)
+    if fields:
+        builder.select_fields(fields)
 
-        # Construir query
-        builder = QueryBuilder(entity=entity, limite=limite)
-        for key, value in (filters or {}).items():
-            if value is not None and value != "":
-                builder.add_filter(key, value)
-        if fields:
-            builder.select_fields(fields)
+    query = builder.build()
 
-        query = builder.build()
-
-        s = SubscripcionNotificacion(
-            usuario_id=usuario_id,
-            nombre=nombre,
-            descripcion=descripcion,
-            graphql_query=query,
-            campo_id="id",
-            campos_comparar=fields,
-            frecuencia=frecuencia,
-            hora_preferida=hora_preferida,
-        )
-        db.add(s)
-        db.commit()
-        db.refresh(s)
-        return _suscripcion_to_type(s)
+    s = SubscripcionNotificacion(
+        usuario_id=usuario_id,
+        nombre=nombre,
+        descripcion=descripcion,
+        graphql_query=query,
+        campo_id="id",
+        campos_comparar=fields,
+        frecuencia=frecuencia,
+        hora_preferida=hora_preferida,
+    )
+    
+    db.add(s)
+    await db.commit()
+    await db.refresh(s)
+    
+    return _suscripcion_to_type(s)
 
 
 async def actualizar_suscripcion(
-    id: int,
+    info,
+    id: UUID,
     nombre: Optional[str] = None,
     descripcion: Optional[str] = None,
     graphql_query: Optional[str] = None,
@@ -436,81 +528,110 @@ async def actualizar_suscripcion(
     activo: Optional[bool] = None,
     max_errores: Optional[int] = None
 ) -> Optional[SuscripcionType]:
-    """Actualiza una suscripcion."""
-    with get_db_context() as db:
-        s = db.query(SubscripcionNotificacion).filter(SubscripcionNotificacion.id == id).first()
-        if not s:
-            return None
+    db = info.context["db"]
+    
+    stmt = select(SubscripcionNotificacion).where(SubscripcionNotificacion.id == id)
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
+    
+    if not s:
+        return None
 
-        if nombre is not None:
-            s.nombre = nombre
-        if descripcion is not None:
-            s.descripcion = descripcion
-        if graphql_query is not None:
-            s.graphql_query = graphql_query
-        if campo_id is not None:
-            s.campo_id = campo_id
-        if campos_comparar is not None:
-            s.campos_comparar = campos_comparar
-        if frecuencia is not None:
-            s.frecuencia = frecuencia
-        if hora_preferida is not None:
-            s.hora_preferida = hora_preferida
-        if max_errores is not None:
-            s.max_errores = max_errores
-        if activo is not None:
-            s.activo = activo
-            if activo:
-                s.pausado_por_errores = False
-                s.errores_consecutivos = 0
+    if nombre is not None:
+        s.nombre = nombre
+    if descripcion is not None:
+        s.descripcion = descripcion
+    if graphql_query is not None:
+        s.graphql_query = graphql_query
+    if campo_id is not None:
+        s.campo_id = campo_id
+    if campos_comparar is not None:
+        s.campos_comparar = campos_comparar
+    if frecuencia is not None:
+        s.frecuencia = frecuencia
+    if hora_preferida is not None:
+        s.hora_preferida = hora_preferida
+    if max_errores is not None:
+        s.max_errores = max_errores
+    if activo is not None:
+        s.activo = activo
+        if activo:
+            s.pausado_por_errores = False
+            s.errores_consecutivos = 0
 
-        db.commit()
-        db.refresh(s)
-        return _suscripcion_to_type(s)
-
-
-async def eliminar_suscripcion(id: int) -> bool:
-    """Elimina una suscripcion."""
-    with get_db_context() as db:
-        s = db.query(SubscripcionNotificacion).filter(SubscripcionNotificacion.id == id).first()
-        if not s:
-            return False
-        db.delete(s)
-        db.commit()
-        return True
+    await db.commit()
+    await db.refresh(s)
+    
+    return _suscripcion_to_type(s)
 
 
-async def ejecutar_suscripcion(id: int) -> Optional[EjecucionType]:
-    """Ejecuta manualmente una suscripcion."""
+async def eliminar_suscripcion(
+    info,
+    id: UUID
+) -> bool:
+    db = info.context["db"]
+    
+    stmt = select(SubscripcionNotificacion).where(SubscripcionNotificacion.id == id)
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
+    
+    if not s:
+        return False
+    
+    await db.delete(s)
+    await db.commit()
+    
+    return True
+
+
+async def ejecutar_suscripcion(
+    info,
+    id: UUID
+) -> Optional[EjecucionType]:
     from telegram_notifications.monitor import process_subscription
+    
+    db = info.context["db"]
+    
+    stmt = select(SubscripcionNotificacion).where(SubscripcionNotificacion.id == id)
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
+    
+    if not s:
+        return None
 
-    with get_db_context() as db:
-        s = db.query(SubscripcionNotificacion).filter(SubscripcionNotificacion.id == id).first()
-        if not s:
-            return None
+    # Esto debería ser async también, pero el monitor es síncrono
+    process_subscription(db, s)
 
-        process_subscription(db, s)
+    # Obtener ultima ejecucion
+    stmt_ejec = select(EjecucionNotificacion).where(
+        EjecucionNotificacion.subscripcion_id == id
+    ).order_by(EjecucionNotificacion.id.desc()).limit(1)
+    
+    result = await db.execute(stmt_ejec)
+    e = result.scalar_one_or_none()
+    
+    return _ejecucion_to_type(e) if e else None
 
-        # Obtener ultima ejecucion
-        e = db.query(EjecucionNotificacion).filter(
-            EjecucionNotificacion.subscripcion_id == id
-        ).order_by(EjecucionNotificacion.id.desc()).first()
 
-        return _ejecucion_to_type(e) if e else None
+async def reactivar_suscripcion(
+    info,
+    id: UUID
+) -> Optional[SuscripcionType]:
+    db = info.context["db"]
+    
+    stmt = select(SubscripcionNotificacion).where(SubscripcionNotificacion.id == id)
+    result = await db.execute(stmt)
+    s = result.scalar_one_or_none()
+    
+    if not s:
+        return None
 
+    s.activo = True
+    s.pausado_por_errores = False
+    s.errores_consecutivos = 0
+    s.ultimo_error = None
 
-async def reactivar_suscripcion(id: int) -> Optional[SuscripcionType]:
-    """Reactiva una suscripcion pausada por errores."""
-    with get_db_context() as db:
-        s = db.query(SubscripcionNotificacion).filter(SubscripcionNotificacion.id == id).first()
-        if not s:
-            return None
-
-        s.activo = True
-        s.pausado_por_errores = False
-        s.errores_consecutivos = 0
-        s.ultimo_error = None
-
-        db.commit()
-        db.refresh(s)
-        return _suscripcion_to_type(s)
+    await db.commit()
+    await db.refresh(s)
+    
+    return _suscripcion_to_type(s)

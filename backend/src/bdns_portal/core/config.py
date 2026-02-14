@@ -20,9 +20,10 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PASSWORD: Optional[str] = None
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # GraphQL
-    GRAPHQL_URL: str = "http://localhost:8000/graphql"
+    GRAPHQL_URL: str = "http://localhost:8001/graphql"
 
     # Telegram
     TELEGRAM_BOT_TOKEN: Optional[str] = None

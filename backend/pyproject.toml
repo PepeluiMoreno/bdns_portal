@@ -1,20 +1,35 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "bdns-api"
+name = "bdns-portal"
 version = "0.1.0"
+description = "Portal web para BDNS"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "Pepelui Moreno", email = "joseluis.morgomez@gmail.com"},
+]
 dependencies = [
-    "fastapi",
-    "requests",
-    "uvicorn",
-    "strawberry-graphql",
-    "sqlalchemy",
-    "python-dotenv",
-    "alembic",
-    "bdns_core",
- 
+    "bdns-core>=0.1.0",
+    # API
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    # Base de datos
+    "sqlalchemy>=2.0.23",
+    "asyncpg>=0.29.0",
+    # Cache/Sesiones (portal específico)
+    "redis>=5.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.setuptools]
+packages = ["bdns_portal"]
 package-dir = {"" = "src"}
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[project.scripts]
+bdns-portal = "bdns_portal.main:main"

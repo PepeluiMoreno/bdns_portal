@@ -44,7 +44,7 @@ services:
   #     dockerfile: Dockerfile
   #   container_name: bdns_portal_backend
   #   ports:
-  #     - "8000:8000"
+  #     - "8001:8001"
   #   environment:
   #     DATABASE_URL: postgresql://bdns_user:bdns_password@postgres:5432/bdns
   #     REDIS_URL: redis://redis:6379/0

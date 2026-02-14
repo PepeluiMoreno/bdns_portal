@@ -30,7 +30,7 @@ bdns_portal/
 - FastAPI + Strawberry GraphQL
 - SQLAlchemy 2.0 + PostgreSQL 16
 - Redis (caché)
-- Puerto: 8000
+- Puerto: 8001
 
 ### Frontend
 - Vue 3 + Vite
@@ -59,7 +59,7 @@ npm run dev
 
 ## 📚 Documentación de API
 
-GraphQL Playground: http://localhost:8000/graphql
+GraphQL Playground: http://localhost:8001/graphql
 
 **Ejemplo de query:**
 ```graphql
@@ -77,9 +77,9 @@ query {
 
 ## 🔗 Enlaces
 
-- **Backend GraphQL:** http://localhost:8000/graphql
+- **Backend GraphQL:** http://localhost:8001/graphql
 - **Frontend:** http://localhost:3000
-- **Health check:** http://localhost:8000/health
+- **Health check:** http://localhost:8001/health
 
 ## 📝 Notas
 

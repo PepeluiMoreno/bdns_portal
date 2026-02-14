@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir -e /app/backend
 COPY scripts /app/scripts
 
 # Exponer puerto
-EXPOSE 8000
+EXPOSE 8001
 
 # Punto de entrada
-CMD ["uvicorn", "bdns_api.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "bdns_api.server:app", "--host", "0.0.0.0", "--port", "8001"]

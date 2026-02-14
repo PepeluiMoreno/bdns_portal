@@ -32,7 +32,7 @@ bdns/
 │   │   │   └── apollo/           # Cliente GraphQL
 │   │   └── package.json
 │   │
-│   ├── bdns-search-backend/      # 🔌 API GraphQL pública - Puerto 8000
+│   ├── bdns-search-backend/      # 🔌 API GraphQL pública - Puerto 8001
 │   │   ├── main.py
 │   │   ├── alembic/              # Migraciones DB
 │   │   └── src/bdns_api/
@@ -156,8 +156,8 @@ openssl rand -hex 32
 
 ### Backend
 - **Framework:** FastAPI + Strawberry GraphQL
-- **Puerto:** 8000
-- **URL:** http://localhost:8000/graphql
+- **Puerto:** 8001
+- **URL:** http://localhost:8001/graphql
 
 **Endpoints:**
 - `GET /graphql` - GraphQL Playground
@@ -295,7 +295,7 @@ alembic upgrade head
 
 # Iniciar servidor
 python main.py
-# http://localhost:8000/graphql
+# http://localhost:8001/graphql
 ```
 
 ### 2. Backend de ETL Admin (REST)
@@ -378,7 +378,7 @@ alembic upgrade head
          │ SELECT
          ▼
 ┌──────────────────┐
-│ Search API       │ (GraphQL - Puerto 8000)
+│ Search API       │ (GraphQL - Puerto 8001)
 │  - Query data    │
 │  - Cache Redis   │
 └────────┬─────────┘
@@ -448,7 +448,7 @@ alembic upgrade head
 | **Frontend** | Vue3 + GraphQL | Vue3 + REST + WS |
 | **Backend** | FastAPI + Strawberry | FastAPI |
 | **Puerto Front** | 3000 | 3001 |
-| **Puerto Back** | 8000 | 8001 |
+| **Puerto Back** | 8001 | 8001 |
 | **Autenticación** | No | Sí (JWT) |
 | **Usuarios** | Público | Admin, User |
 | **Cache** | Redis (1h) | No |

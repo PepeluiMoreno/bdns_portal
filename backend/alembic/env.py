@@ -42,8 +42,17 @@ target_metadata = Base.metadata
 EXCLUDE_TABLES = {"spatial_ref_sys"}
 
 def include_object(object, name, type_, reflected, compare_to):
-    if type_ == "table" and name in EXCLUDE_TABLES:
-        return False
+    """
+    Incluir solo objetos del esquema bdns.
+
+    Esto evita que Alembic intente gestionar tablas de otros esquemas (como bdns_etl).
+    """
+    if type_ == "table":
+        # Excluir tablas específicas de PostGIS
+        if name in EXCLUDE_TABLES:
+            return False
+        # Solo incluir tablas del esquema bdns
+        return object.schema == "bdns"
     return True
 
 # -----------------------------
@@ -61,6 +70,8 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_object=include_object,
+        include_schemas=True,
+        version_table_schema="bdns",  # Tabla de versiones en bdns
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -76,7 +87,13 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+            include_schemas=True,
+            version_table_schema="bdns",  # Tabla de versiones en bdns
+        )
         with context.begin_transaction():
             context.run_migrations()
 

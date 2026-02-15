@@ -25,9 +25,6 @@ class Settings(BaseSettings):
     # GraphQL
     GRAPHQL_URL: str = "http://localhost:8001/graphql"
 
-    # Telegram
-    TELEGRAM_BOT_TOKEN: Optional[str] = None
-
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
